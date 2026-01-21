@@ -19,6 +19,7 @@ jobs:
         arch: 'win64_mingw81'
 
     - name: Configure
+      shell: cmd
       run: |
         mkdir build
         cd build
