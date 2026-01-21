@@ -12,34 +12,77 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Setup MSYS2 / MinGW (instala toolchain)
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-pkg-config
+
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
         version: '5.15.2'
         arch: 'win64_mingw81'
 
+    - name: Debug toolchain
+      shell: pwsh
+      run: |
+        Write-Host "=== PATH ==="
+        Write-Host $env:PATH
+        Write-Host "=== Locate toolchain executables ==="
+        where.exe cc || true
+        where.exe gcc || true
+        where.exe mingw32-make || true
+        Write-Host "=== Versions ==="
+        & C:/mingw64/bin/cc.exe --version 2>&1 || & gcc --version 2>&1 || & mingw32-make --version 2>&1 || Write-Host "No explicit version output"
+        Write-Host "=== Try compiling a tiny C program ==="
+        'int main(){return 0;}' | Out-File -FilePath test.c -Encoding ascii
+        try {
+          & C:/mingw64/bin/cc.exe test.c -o test.exe 2>&1 | Write-Host
+          if (Test-Path test.exe) {
+            Write-Host "Test program compiled successfully."
+          } else {
+            Write-Error "Test program did not produce an executable."
+            exit 1
+          }
+        } catch {
+          Write-Error "Compilation test failed: $_"
+          exit 1
+        }
+
     - name: Configure
       shell: pwsh
       run: |
-        mkdir build
-        cd build
-        cmake .. `
-          -G "MinGW Makefiles" `
-          -DCMAKE_BUILD_TYPE=Release `
-          -DLauncher_LAYOUT=win-bundle `
-          -DLauncher_BUILD_PLATFORM=win64
-
+        cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DLauncher_LAYOUT=win-bundle -DLauncher_BUILD_PLATFORM=win64
 
     - name: Build
       shell: pwsh
       run: |
-        cd build
-        mingw32-make -j2
+        cmake --build build --config Release -- -j2
 
     - name: Deploy Qt
+      shell: pwsh
       run: |
-        cd build
-        windeployqt *.exe
+        Set-Location -Path build
+        $w = Get-Command windeployqt.exe -ErrorAction SilentlyContinue
+        if (-not $w) { $w = Get-Command windeployqt -ErrorAction SilentlyContinue }
+        if (-not $w) {
+          Write-Error "windeployqt not found in PATH. Verifique se o Qt foi instalado e se o binário está acessível."
+          exit 1
+        }
+        $exes = Get-ChildItem -Path . -Filter *.exe -File -ErrorAction SilentlyContinue
+        if (-not $exes -or $exes.Count -eq 0) {
+          Write-Error "Nenhum arquivo .exe encontrado em build/. Verifique se a build gerou executáveis."
+          exit 1
+        }
+        foreach ($e in $exes) {
+          Write-Host "Running windeployqt for $($e.Name)"
+          & $w.Path $e.FullName
+        }
 
     - name: Upload EXE
       uses: actions/upload-artifact@v4
