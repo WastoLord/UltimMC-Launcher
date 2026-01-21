@@ -19,17 +19,19 @@ jobs:
         arch: 'win64_mingw81'
 
     - name: Configure
-      shell: cmd
+      shell: pwsh
       run: |
         mkdir build
         cd build
-        cmake .. ^
-          -G "MinGW Makefiles" ^
-          -DCMAKE_BUILD_TYPE=Release ^
-          -DLauncher_LAYOUT=win-bundle ^
+        cmake .. `
+          -G "MinGW Makefiles" `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DLauncher_LAYOUT=win-bundle `
           -DLauncher_BUILD_PLATFORM=win64
 
+
     - name: Build
+      shell: pwsh
       run: |
         cd build
         mingw32-make -j2
