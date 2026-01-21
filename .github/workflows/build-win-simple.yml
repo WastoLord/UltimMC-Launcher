@@ -12,6 +12,23 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Setup Python 3.11 (fix pyzstd build issues)
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Upgrade pip/setuptools/wheel
+      shell: pwsh
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+
+    - name: Show Python info (debug)
+      shell: pwsh
+      run: |
+        python --version
+        python -m pip --version
+        python -m pip list --format=columns
+
     - name: Setup MSYS2 / MinGW (instala toolchain)
       uses: msys2/setup-msys2@v2
       with:
@@ -22,13 +39,12 @@ jobs:
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-pkg-config
 
-    - name: Install Qt (try older action version to avoid aqtinstall bug)
-      # trocar para @v3 se quiser testar a versão mais nova novamente
+    - name: Install Qt (usar v2 para maior compatibilidade)
       uses: jurplel/install-qt-action@v2
       with:
         version: '5.15.2'
         arch: 'win64_mingw81'
-        # opcional: output: Qt   (pode ser adicionado se precisar do caminho)
+        # opcional: output: Qt
 
     - name: Debug toolchain
       shell: pwsh
