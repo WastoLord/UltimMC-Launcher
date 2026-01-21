@@ -8,11 +8,12 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
       with:
         submodules: recursive
 
-    - name: Setup Python 3.11 (fix pyzstd build issues)
+    - name: Setup Python 3.11 (ensure compatible wheels for aqtinstall)
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
@@ -21,15 +22,10 @@ jobs:
       shell: pwsh
       run: |
         python -m pip install --upgrade pip setuptools wheel
-
-    - name: Show Python info (debug)
-      shell: pwsh
-      run: |
         python --version
         python -m pip --version
-        python -m pip list --format=columns
 
-    - name: Setup MSYS2 / MinGW (instala toolchain)
+    - name: Setup MSYS2 / MinGW (install toolchain)
       uses: msys2/setup-msys2@v2
       with:
         msystem: MINGW64
@@ -39,71 +35,92 @@ jobs:
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-pkg-config
 
-    - name: Install Qt (usar v2 para maior compatibilidade)
-      uses: jurplel/install-qt-action@v2
-      with:
-        version: '5.15.2'
-        arch: 'win64_mingw81'
-        # opcional: output: Qt
-
-    - name: Debug toolchain
+    - name: Install aqtinstall (AQTool) and dependencies with controlled Python
       shell: pwsh
       run: |
-        Write-Host "=== PATH ==="
-        Write-Host $env:PATH
-        Write-Host "=== Locate toolchain executables ==="
-        where.exe cc || true
-        where.exe gcc || true
-        where.exe mingw32-make || true
-        Write-Host "=== Versions ==="
-        & C:/mingw64/bin/cc.exe --version 2>&1 || & gcc --version 2>&1 || & mingw32-make --version 2>&1 || Write-Host "No explicit version output"
-        Write-Host "=== Try compiling a tiny C program ==="
-        'int main(){return 0;}' | Out-File -FilePath test.c -Encoding ascii
-        try {
-          & C:/mingw64/bin/cc.exe test.c -o test.exe 2>&1 | Write-Host
-          if (Test-Path test.exe) {
-            Write-Host "Test program compiled successfully."
-          } else {
-            Write-Error "Test program did not produce an executable."
-            exit 1
-          }
-        } catch {
-          Write-Error "Compilation test failed: $_"
+        python -m pip install --upgrade pip
+        python -m pip install aqtinstall==3.1.21 py7zr==1.1.2
+        python -m pip show aqtinstall
+        python -m pip show py7zr
+
+    - name: Install Qt using aqt (runs with the Python we set up)
+      shell: pwsh
+      env:
+        AQT_OUTPUTDIR: "${{ github.workspace }}\\Qt"
+      run: |
+        # Install Qt for MinGW (uses python from setup-python above)
+        # Using the module call ensures we use the intended Python, avoiding actions that pick an unexpected python version.
+        python -m aqt install-qt windows desktop 5.15.2 win64_mingw81 --outputdir "${env:AQT_OUTPUTDIR}" --archives
+        # After install, verify windeployqt exists
+        $qtBin = Join-Path "${env:AQT_OUTPUTDIR}" "5.15.2\\mingw81_64\\bin"
+        Write-Host "Qt bin dir: $qtBin"
+        if (-not (Test-Path $qtBin)) {
+          Write-Error "Qt bin directory not found at $qtBin"
+          Get-ChildItem "${env:AQT_OUTPUTDIR}" -Recurse | Select-Object -First 100 | ForEach-Object { Write-Host $_.FullName }
           exit 1
         }
+        Get-ChildItem $qtBin -Filter windeployqt* -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
 
-    - name: Configure
+    - name: Configure (CMake)
       shell: pwsh
       run: |
-        cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DLauncher_LAYOUT=win-bundle -DLauncher_BUILD_PLATFORM=win64
+        cmake -S . -B build -G "MinGW Makefiles" `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DLauncher_LAYOUT=win-bundle `
+          -DLauncher_BUILD_PLATFORM=win64
 
     - name: Build
       shell: pwsh
       run: |
         cmake --build build --config Release -- -j2
 
-    - name: Deploy Qt
+    - name: Deploy Qt (windeployqt)
+      shell: pwsh
+      run: |
+        # locate Qt bin directory where windeployqt was installed
+        $qtBase = Join-Path $PWD "Qt\\5.15.2\\mingw81_64\\bin"
+        if (-not (Test-Path $qtBase)) {
+          # fallback: try common install locations
+          $alt = Get-ChildItem -Path $PWD -Filter "windeployqt.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($alt) {
+            $qtBin = Split-Path $alt.FullName
+          } else {
+            Write-Error "windeployqt not found. Ensure Qt was installed to ${PWD}\\Qt and contains 5.15.2\\mingw81_64\\bin"
+            exit 1
+          }
+        } else {
+          $qtBin = $qtBase
+        }
+
+        Write-Host "Using Qt bin: $qtBin"
+        Set-Location -Path build
+
+        $exes = Get-ChildItem -Path . -Filter *.exe -File -Recurse -ErrorAction SilentlyContinue
+        if (-not $exes -or $exes.Count -eq 0) {
+          Write-Error "Nenhum .exe encontrado em build/. Verifique se a build gerou executáveis."
+          exit 1
+        }
+
+        foreach ($e in $exes) {
+          Write-Host "Deploying $($e.FullName) with windeployqt"
+          & (Join-Path $qtBin "windeployqt.exe") $e.FullName
+        }
+
+    - name: Zip EXE(s)
       shell: pwsh
       run: |
         Set-Location -Path build
-        $w = Get-Command windeployqt.exe -ErrorAction SilentlyContinue
-        if (-not $w) { $w = Get-Command windeployqt -ErrorAction SilentlyContinue }
-        if (-not $w) {
-          Write-Error "windeployqt not found in PATH. Verifique se o Qt foi instalado e se o binário está acessível."
-          exit 1
-        }
-        $exes = Get-ChildItem -Path . -Filter *.exe -File -ErrorAction SilentlyContinue
+        $exes = Get-ChildItem -Path . -Filter *.exe -File -Recurse -ErrorAction SilentlyContinue
         if (-not $exes -or $exes.Count -eq 0) {
-          Write-Error "Nenhum arquivo .exe encontrado em build/. Verifique se a build gerou executáveis."
+          Write-Error "Nenhum .exe encontrado para compactar."
           exit 1
         }
-        foreach ($e in $exes) {
-          Write-Host "Running windeployqt for $($e.Name)"
-          & $w.Path $e.FullName
-        }
+        $exePaths = $exes | ForEach-Object { $_.FullName }
+        Compress-Archive -Path $exePaths -DestinationPath "${{ github.workspace }}\\UltimMC-Windows.zip" -Force
+        Write-Host "Created artifact: ${{ github.workspace }}\\UltimMC-Windows.zip"
 
-    - name: Upload EXE
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: UltimMC-Windows
-        path: build/
+        path: UltimMC-Windows.zip
