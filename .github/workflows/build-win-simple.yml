@@ -22,11 +22,13 @@ jobs:
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-pkg-config
 
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
+    - name: Install Qt (try older action version to avoid aqtinstall bug)
+      # trocar para @v3 se quiser testar a versão mais nova novamente
+      uses: jurplel/install-qt-action@v2
       with:
         version: '5.15.2'
         arch: 'win64_mingw81'
+        # opcional: output: Qt   (pode ser adicionado se precisar do caminho)
 
     - name: Debug toolchain
       shell: pwsh
