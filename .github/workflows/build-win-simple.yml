@@ -216,7 +216,8 @@ jobs:
 
   build-mac:
     name: build-mac
-    runs-on: macos-13
+    # use macos-15-intel to get Intel macOS runner (se você precisa x86_64)
+    runs-on: macos-15-intel
 
     steps:
       - uses: actions/checkout@main
@@ -229,23 +230,34 @@ jobs:
           path: /Users/runner/Library/Caches/Homebrew
           key: ${{ runner.os }}-deps-cache
 
-      - name: Install Dependencies
+      - name: Install Dependencies (Qt5)
         run: |
-          brew cleanup
-          brew install qt@5
+          set -e
+          brew update
+          # Tenta instalar qt@5 diretamente. Se não existir no core, tenta o tap cartr/qt5.
+          if brew info qt@5 >/dev/null 2>&1; then
+            brew install qt@5
+          else
+            brew tap cartr/qt5
+            brew install cartr/qt5/qt@5
+          fi
+          # Ajusta PATH/CMAKE vars para o Qt instalado pelo brew
+          echo "QT_PREFIX=$(brew --prefix qt@5 2>/dev/null || brew --prefix cartr/qt5/qt@5 2>/dev/null)" >> $GITHUB_ENV
 
       - name: Build
         run: |
-          mkdir build
+          set -euo pipefail
+          mkdir -p build
           cd build
+          # usa o prefix detectado em QT_PREFIX
           cmake \
            -DCMAKE_C_COMPILER=/usr/bin/clang \
            -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
            -DCMAKE_BUILD_TYPE=Release \
            -DLauncher_NOTIFICATION_URL:STRING=https://files.multimc.org/notifications.json \
            -DCMAKE_INSTALL_PREFIX:PATH="/Users/runner/work/UltimMC/build/dist" \
-           -DCMAKE_PREFIX_PATH="$(brew --prefix qt@5)/lib/cmake" \
-           -DQt5_DIR="$(brew --prefix qt@5)" \
+           -DCMAKE_PREFIX_PATH:PATH="${QT_PREFIX}/lib/cmake" \
+           -DQt5_DIR:PATH="${QT_PREFIX}/lib/cmake/Qt5" \
            -DLauncher_UPDATER_BASE=https://files.multimc.org/update/ \
            -DLauncher_PASTE_EE_API_KEY:STRING=utLvciUouSURFzfjPxLBf5W4ISsUX4pwBDF7N1AfZ \
            -DLauncher_ANALYTICS_ID:STRING=UA-87731965-2 \
