@@ -9,7 +9,6 @@ on:
         default: 'intel'
 
 env:
-  # Mantive as chaves embutidas conforme seu pedido
   LAUNCHER_PASTE_EE_API_KEY: "utLvciUouSURFzfjPxLBf5W4ISsUX4pwBDF7N1AfZ"
   LAUNCHER_ANALYTICS_ID: "UA-87731965-2"
   LAUNCHER_NOTIFICATION_URL: "https://files.multimc.org/notifications.json"
@@ -27,7 +26,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: recursive
 
       - name: Cache Homebrew
         uses: actions/cache@v3
@@ -64,7 +63,7 @@ jobs:
             ls -la "${QT_PREFIX}/include" || true
           fi
 
-      - name: Configure (CMake) — verbose output saved
+      - name: Configure (CMake) - verbose output saved
         run: |
           set -euo pipefail
           mkdir -p build
@@ -89,7 +88,7 @@ jobs:
             $GITHUB_WORKSPACE 2>&1 | tee ../cmake_output.log
           cmake -LAH . > ../cmake_cache_and_vars.txt || true
 
-      - name: Compile (make) — verbose output saved
+      - name: Compile (make) - verbose output saved
         run: |
           set -euo pipefail
           cd build
@@ -130,7 +129,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: recursive
 
       - name: Cache Homebrew
         uses: actions/cache@v3
@@ -167,7 +166,7 @@ jobs:
             ls -la "${QT_PREFIX}/include" || true
           fi
 
-      - name: Configure (CMake) — verbose output saved
+      - name: Configure (CMake) - verbose output saved
         run: |
           set -euo pipefail
           mkdir -p build
@@ -192,7 +191,7 @@ jobs:
             $GITHUB_WORKSPACE 2>&1 | tee ../cmake_output.log
           cmake -LAH . > ../cmake_cache_and_vars.txt || true
 
-      - name: Compile (make) — verbose output saved
+      - name: Compile (make) - verbose output saved
         run: |
           set -euo pipefail
           cd build
