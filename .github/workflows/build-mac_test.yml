@@ -1,4 +1,4 @@
-name: Build macOS (sanity)
+name: Build macOS (manual)
 
 on:
   workflow_dispatch:
@@ -8,37 +8,215 @@ on:
         required: false
         default: 'intel'
 
+env:
+  LAUNCHER_PASTE_EE_API_KEY: "utLvciUouSURFzfjPxLBf5W4ISsUX4pwBDF7N1AfZ"
+  LAUNCHER_ANALYTICS_ID: "UA-87731965-2"
+  LAUNCHER_NOTIFICATION_URL: "https://files.multimc.org/notifications.json"
+  LAUNCHER_UPDATER_BASE: "https://files.multimc.org/update/"
+  LAUNCHER_BUG_TRACKER_URL: "https://github.com/UltimMC/Launcher/issues"
+  LAUNCHER_EMBED_SECRETS: "On"
+
 jobs:
   build-mac-intel:
     name: build-mac (intel)
     if: ${{ github.event.inputs.arch != 'arm64' }}
     runs-on: macos-15-intel
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Quick intel smoke
+        with:
+          submodules: recursive
+
+      - name: Cache Homebrew
+        uses: actions/cache@v3
+        with:
+          path: /Users/runner/Library/Caches/Homebrew
+          key: ${{ runner.os }}-homebrew-cache
+
+      - name: Install Qt5 via Homebrew
         run: |
-          echo "Running intel mac job"
-          uname -a
-      - name: Upload marker
+          set -e
+          brew update
+          if brew info qt@5 >/dev/null 2>&1; then
+            brew install qt@5
+          else
+            brew tap cartr/qt5 || true
+            brew install cartr/qt5/qt@5
+          fi
+          QT_PREFIX=$(brew --prefix qt@5 2>/dev/null || brew --prefix cartr/qt5/qt@5 2>/dev/null || true)
+          echo "QT_PREFIX=${QT_PREFIX}" >> $GITHUB_ENV
+          echo "QT_PREFIX=${QT_PREFIX}"
+
+      - name: Diagnostic: env and tools
+        run: |
+          echo "### environment ###"
+          env | sort
+          echo "### brew, clang, cmake ###"
+          brew --version || true
+          clang --version || true
+          cmake --version || true
+          echo "QT_PREFIX=${QT_PREFIX}"
+          if [ -n "${QT_PREFIX}" ]; then
+            ls -la "${QT_PREFIX}/lib/cmake" || true
+            ls -la "${QT_PREFIX}/include" || true
+          fi
+
+      - name: Configure (CMake) - verbose
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          cd build
+          export CMAKE_OSX_ARCHITECTURES=x86_64
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON \
+            -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES} \
+            -DCMAKE_C_COMPILER=/usr/bin/clang \
+            -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLauncher_NOTIFICATION_URL:STRING=${LAUNCHER_NOTIFICATION_URL} \
+            -DCMAKE_INSTALL_PREFIX:PATH="/Users/runner/work/UltimMC/build/dist" \
+            -DCMAKE_PREFIX_PATH:PATH="${QT_PREFIX}/lib/cmake" \
+            -DQt5_DIR:PATH="${QT_PREFIX}/lib/cmake/Qt5" \
+            -DLauncher_UPDATER_BASE=${LAUNCHER_UPDATER_BASE} \
+            -DLauncher_PASTE_EE_API_KEY:STRING=${LAUNCHER_PASTE_EE_API_KEY} \
+            -DLauncher_ANALYTICS_ID:STRING=${LAUNCHER_ANALYTICS_ID} \
+            -DLauncher_LAYOUT=mac-bundle \
+            -DLauncher_BUILD_PLATFORM=osx64-5.15.2 \
+            -DLauncher_BUG_TRACKER_URL=${LAUNCHER_BUG_TRACKER_URL} \
+            -DLauncher_EMBED_SECRETS=${LAUNCHER_EMBED_SECRETS} \
+            $GITHUB_WORKSPACE 2>&1 | tee ../cmake_output.log
+          cmake -LAH . > ../cmake_cache_and_vars.txt || true
+
+      - name: Build (make) - verbose
+        run: |
+          set -euo pipefail
+          cd build
+          make -j$(sysctl -n hw.logicalcpu) VERBOSE=1 2>&1 | tee ../build_output.log || (echo "make failed, see build_output.log" && exit 1)
+
+      - name: Test (save logs)
+        run: |
+          set -e
+          cd build
+          make test 2>&1 | tee ../test_output.log || true
+          cmake -E remove_directory "/Users/runner/work/UltimMC/build/dist" || true
+
+      - name: Install (save logs)
+        run: |
+          set -e
+          cd build
+          make install 2>&1 | tee ../install_output.log || (echo "install failed" && exit 1)
+          chmod +x /Users/runner/work/UltimMC/build/dist/UltimMC.app/Contents/MacOS/UltimMC || true
+
+      - name: Upload build artifacts and logs
         uses: actions/upload-artifact@v3
         with:
-          name: mac-intel-marker
-          path: .github/workflows/build-mac_test.yml
+          name: mac-build-output-intel
+          path: |
+            cmake_output.log
+            cmake_cache_and_vars.txt
+            build_output.log
+            test_output.log
+            install_output.log
+            /Users/runner/work/UltimMC/build/dist
 
   build-mac-arm:
     name: build-mac (arm64)
     if: ${{ github.event.inputs.arch == 'arm64' }}
     runs-on: macos-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Quick arm smoke
+        with:
+          submodules: recursive
+
+      - name: Cache Homebrew
+        uses: actions/cache@v3
+        with:
+          path: /Users/runner/Library/Caches/Homebrew
+          key: ${{ runner.os }}-homebrew-cache
+
+      - name: Install Qt5 via Homebrew
         run: |
-          echo "Running arm mac job"
-          uname -a
-      - name: Upload marker
+          set -e
+          brew update
+          if brew info qt@5 >/dev/null 2>&1; then
+            brew install qt@5
+          else
+            brew tap cartr/qt5 || true
+            brew install cartr/qt5/qt@5
+          fi
+          QT_PREFIX=$(brew --prefix qt@5 2>/dev/null || brew --prefix cartr/qt5/qt@5 2>/dev/null || true)
+          echo "QT_PREFIX=${QT_PREFIX}" >> $GITHUB_ENV
+          echo "QT_PREFIX=${QT_PREFIX}"
+
+      - name: Diagnostic: env and tools
+        run: |
+          echo "### environment ###"
+          env | sort
+          echo "### brew, clang, cmake ###"
+          brew --version || true
+          clang --version || true
+          cmake --version || true
+          echo "QT_PREFIX=${QT_PREFIX}"
+          if [ -n "${QT_PREFIX}" ]; then
+            ls -la "${QT_PREFIX}/lib/cmake" || true
+            ls -la "${QT_PREFIX}/include" || true
+          fi
+
+      - name: Configure (CMake) - verbose
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          cd build
+          export CMAKE_OSX_ARCHITECTURES=arm64
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON \
+            -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES} \
+            -DCMAKE_C_COMPILER=/usr/bin/clang \
+            -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLauncher_NOTIFICATION_URL:STRING=${LAUNCHER_NOTIFICATION_URL} \
+            -DCMAKE_INSTALL_PREFIX:PATH="/Users/runner/work/UltimMC/build/dist" \
+            -DCMAKE_PREFIX_PATH:PATH="${QT_PREFIX}/lib/cmake" \
+            -DQt5_DIR:PATH="${QT_PREFIX}/lib/cmake/Qt5" \
+            -DLauncher_UPDATER_BASE=${LAUNCHER_UPDATER_BASE} \
+            -DLauncher_PASTE_EE_API_KEY:STRING=${LAUNCHER_PASTE_EE_API_KEY} \
+            -DLauncher_ANALYTICS_ID:STRING=${LAUNCHER_ANALYTICS_ID} \
+            -DLauncher_LAYOUT=mac-bundle \
+            -DLauncher_BUILD_PLATFORM=osx64-5.15.2 \
+            -DLauncher_BUG_TRACKER_URL=${LAUNCHER_BUG_TRACKER_URL} \
+            -DLauncher_EMBED_SECRETS=${LAUNCHER_EMBED_SECRETS} \
+            $GITHUB_WORKSPACE 2>&1 | tee ../cmake_output.log
+          cmake -LAH . > ../cmake_cache_and_vars.txt || true
+
+      - name: Build (make) - verbose
+        run: |
+          set -euo pipefail
+          cd build
+          make -j$(sysctl -n hw.logicalcpu) VERBOSE=1 2>&1 | tee ../build_output.log || (echo "make failed, see build_output.log" && exit 1)
+
+      - name: Test (save logs)
+        run: |
+          set -e
+          cd build
+          make test 2>&1 | tee ../test_output.log || true
+          cmake -E remove_directory "/Users/runner/work/UltimMC/build/dist" || true
+
+      - name: Install (save logs)
+        run: |
+          set -e
+          cd build
+          make install 2>&1 | tee ../install_output.log || (echo "install failed" && exit 1)
+          chmod +x /Users/runner/work/UltimMC/build/dist/UltimMC.app/Contents/MacOS/UltimMC || true
+
+      - name: Upload build artifacts and logs
         uses: actions/upload-artifact@v3
         with:
-          name: mac-arm-marker
-          path: .github/workflows/build-mac_test.yml
+          name: mac-build-output-arm64
+          path: |
+            cmake_output.log
+            cmake_cache_and_vars.txt
+            build_output.log
+            test_output.log
+            install_output.log
+            /Users/runner/work/UltimMC/build/dist
