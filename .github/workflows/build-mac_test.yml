@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       arch:
-        description: 'Arquitetura do runner: "intel" (macos-15-intel) ou "arm64" (macos-latest).'
+        description: 'Arquitetura: "intel" (macos-15-intel) ou "arm64" (macos-latest).'
         required: false
         default: 'intel'
 
@@ -34,7 +34,7 @@ jobs:
           path: /Users/runner/Library/Caches/Homebrew
           key: ${{ runner.os }}-homebrew-cache
 
-      - name: Install Dependencies (Qt5 via Homebrew)
+      - name: Install Qt5 via Homebrew
         run: |
           set -e
           brew update
@@ -48,22 +48,21 @@ jobs:
           echo "QT_PREFIX=${QT_PREFIX}" >> $GITHUB_ENV
           echo "QT_PREFIX=${QT_PREFIX}"
 
-      - name: Diagnostic: env, tools and Qt location
+      - name: Diagnostic: env and tools
         run: |
           echo "### environment ###"
           env | sort
-          echo "### brew, clang, cmake versions ###"
+          echo "### brew, clang, cmake ###"
           brew --version || true
           clang --version || true
           cmake --version || true
-          echo "### QT_PREFIX ###"
           echo "QT_PREFIX=${QT_PREFIX}"
           if [ -n "${QT_PREFIX}" ]; then
             ls -la "${QT_PREFIX}/lib/cmake" || true
             ls -la "${QT_PREFIX}/include" || true
           fi
 
-      - name: Configure (CMake) - verbose output saved
+      - name: Configure (CMake) - verbose
         run: |
           set -euo pipefail
           mkdir -p build
@@ -88,7 +87,7 @@ jobs:
             $GITHUB_WORKSPACE 2>&1 | tee ../cmake_output.log
           cmake -LAH . > ../cmake_cache_and_vars.txt || true
 
-      - name: Compile (make) - verbose output saved
+      - name: Build (make) - verbose
         run: |
           set -euo pipefail
           cd build
@@ -137,7 +136,7 @@ jobs:
           path: /Users/runner/Library/Caches/Homebrew
           key: ${{ runner.os }}-homebrew-cache
 
-      - name: Install Dependencies (Qt5 via Homebrew)
+      - name: Install Qt5 via Homebrew
         run: |
           set -e
           brew update
@@ -151,22 +150,21 @@ jobs:
           echo "QT_PREFIX=${QT_PREFIX}" >> $GITHUB_ENV
           echo "QT_PREFIX=${QT_PREFIX}"
 
-      - name: Diagnostic: env, tools and Qt location
+      - name: Diagnostic: env and tools
         run: |
           echo "### environment ###"
           env | sort
-          echo "### brew, clang, cmake versions ###"
+          echo "### brew, clang, cmake ###"
           brew --version || true
           clang --version || true
           cmake --version || true
-          echo "### QT_PREFIX ###"
           echo "QT_PREFIX=${QT_PREFIX}"
           if [ -n "${QT_PREFIX}" ]; then
             ls -la "${QT_PREFIX}/lib/cmake" || true
             ls -la "${QT_PREFIX}/include" || true
           fi
 
-      - name: Configure (CMake) - verbose output saved
+      - name: Configure (CMake) - verbose
         run: |
           set -euo pipefail
           mkdir -p build
@@ -191,7 +189,7 @@ jobs:
             $GITHUB_WORKSPACE 2>&1 | tee ../cmake_output.log
           cmake -LAH . > ../cmake_cache_and_vars.txt || true
 
-      - name: Compile (make) - verbose output saved
+      - name: Build (make) - verbose
         run: |
           set -euo pipefail
           cd build
