@@ -15,23 +15,15 @@
 
 ## Downloading
 
-- All the available downloads can be found [here](https://nightly.link/UltimMC/Launcher/workflows/main/develop). These builds are directly taken from our [GitHub Actions](https://github.com/UltimMC/Launcher/actions).
+- All the available downloads can be found [here](https://github.com/WastoLord/UltimMC-Launcher/releases/tag/compilado). These builds are directly taken from our [GitHub Actions](https://github.com/WastoLord/UltimMC-Launcher/actions/workflows/build-win-simple.yml).
 
 Direct downloads for specific platforms can be found below.
 
-- *[Windows \(32-bit and 64-bit\)](https://nightly.link/UltimMC/Launcher/workflows/main/develop/mmc-cracked-win32.zip)*.
+- *[Windows \(32-bit and 64-bit\)](https://github.com/WastoLord/UltimMC-Launcher/releases/download/compilado/mmc-cracked-win32.zip)*.
 
-- *[Linux (64-bit)](https://nightly.link/UltimMC/Launcher/workflows/main/develop/mmc-cracked-lin64.zip)*.
+- *[Linux (64-bit)](https://github.com/WastoLord/UltimMC-Launcher/releases/download/compilado/mmc-cracked-lin64.zip)*.
 
-- *[macOS (10.14 and newer)](https://nightly.link/UltimMC/Launcher/workflows/main/develop/mmc-cracked-osx64.zip)*.
 
-> [!NOTE]
-> In the case you're using macOS then another additional step you might need to do
-> is to make `UltimMC` an executable by running the command `chmod +x UltimMC.app/Contents/MacOS/UltimMC` in the terminal.
-
-There's additionally a [.deb package](https://nightly.link/UltimMC/ultimmc-deb/workflows/ci/master/UltimMC.zip) for Debian/Ubuntu distributions.
-
-And an AUR package as [ultimmc-bin](https://aur.archlinux.org/packages/ultimmc-bin). [![ultimmc-bin](https://img.shields.io/badge/ultimmc--bin-1793D1?logo=archlinux&logoColor=white&label=AUR)](https://aur.archlinux.org/packages/ultimmc-bin)
 
 ## Installing and Using
 
